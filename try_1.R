@@ -1,136 +1,112 @@
-setwd("D:/Practice/R/AnalyticsVidya/Black_Friday/")
-train = read.csv("train.csv")
-test = read.csv("test.csv")
-str(train)
-user_id = test$User_ID
-product_id = test$Product_ID
-train$User_ID = NULL
-test$User_ID = NULL
-train$Product_ID = NULL
-test$Product_ID = NULL
-
-###Imputing the values before converting to factors
-summary(train)
-nrow(train[is.na(train$Product_Category_2) & is.na(train$Product_Category_3),])
-
-train$Product_Category_2[is.na(train$Product_Category_2)] <- 0
-summary(train$Product_Category_2)
-
-train$Product_Category_3[is.na(train$Product_Category_3)] <- 0
-summary(train$Product_Category_3)
-
-summary(test)
-nrow(test[is.na(test$Product_Category_2) & !is.na(test$Product_Category_3),])
-
-test$Product_Category_2[is.na(test$Product_Category_2)] <- 0
-summary(test$Product_Category_2)
-
-test$Product_Category_3[is.na(test$Product_Category_3)] <- 0
-summary(test$Product_Category_3)
-
-summary(test)
-summary(train)
-##Conversion to factors
-train$Marital_Status = as.factor(train$Marital_Status)
-train$Occupation = as.factor(train$Occupation)
-train$Product_Category_1 = as.factor(train$Product_Category_1)
-train$Product_Category_2 = as.factor(train$Product_Category_2)
-train$Product_Category_3 = as.factor(train$Product_Category_3)
-  #test
-test$Marital_Status = as.factor(test$Marital_Status)
-test$Occupation = as.factor(test$Occupation)
-test$Product_Category_1 = as.factor(test$Product_Category_1)
-test$Product_Category_2 = as.factor(test$Product_Category_2)
-test$Product_Category_3 = as.factor(test$Product_Category_3)
-
-summary(train)
-summary(train$Occupation)
-
+rm(list = ls())
+#setwd("D:/Practice/R/AnalyticsVidya/Black_Friday/")
+setwd("C:/data/Black_friday-av/")
+train = read.csv("train.csv",stringsAsFactors = F)
+test = read.csv("test.csv",stringsAsFactors = F)
 str(train)
 str(test)
+summary(train)
+summary(test)
+library(dummies)
+library(dplyr)
 
-library(caTools)
-split = sample.split(train$Purchase,SplitRatio = 0.6)
-tr1 = subset(train,split == T)
-te1 = subset(train,split == F)
+table(train$Product_Category_1)
+table(train$Product_Category_2)
+table(train$Product_Category_3)
 
-rmse = function(x,y){
-  return(sqrt((sum((x-y)^2)/length(x))))
-}
 
-###trying the models
-lm.1 = lm(Purchase ~ .,data = tr1)
-summary(lm.1)
-step(lm.1,direction = "backward")
+train_purchase = train$Purchase
+train$Purchase = NULL
 
-lm.step.1 = lm(formula = Purchase ~ Gender + Age + Occupation + City_Category + 
-                 Marital_Status + Product_Category_1 + Product_Category_2 + 
-                 Product_Category_3, data = tr1)
-summary(lm.step.1)
-plot(lm.step.1)
-lm.step.1.pred = predict(lm.step.1,newdata = te1)
-head(lm.step.1.pred)
-head(te1$Purchase)
-rmse(lm.step.1.pred,te1$Purchase)
 
-lm.step.2 = lm(formula = Purchase ~ Gender + Age + Occupation + City_Category + 
-                 Marital_Status + Product_Category_1 + Product_Category_2 + 
-                 Product_Category_3, data = tr1)
-summary(lm.step.2)
-lm.step.2.pred = predict(lm.step.2,newdata = te1)
-rmse(lm.step.2.pred,te1$Purchase)
+full = rbind(train,test)
+table(full$Age)
+full$Age[full$Age == "0-17"] = 15
+full$Age[full$Age == "18-25"] = 21
+full$Age[full$Age == "26-35"] = 30
+full$Age[full$Age == "36-45"] = 40
+full$Age[full$Age == "46-50"] = 48
+full$Age[full$Age == "51-55"] = 53
+full$Age[full$Age == "55+"] = 60
 
-##Anova
+full$Age = as.integer(full$Age)
 
-ano.1 = aov(formula = Purchase ~ Gender + Age + Occupation + City_Category + 
-               Marital_Status + Product_Category_1 + Product_Category_2 + 
-               Product_Category_3, data = tr1)
+full = dummy.data.frame(full,names = c("City_Category"),sep = "-")
 
-summary(ano.1)
-ano.1.pred = predict(ano.1,newdata = te1)
-rmse(ano.1.pred,te1$Purchase)
+table(full$Stay_In_Current_City_Years)
 
-lm.final = lm(formula = Purchase ~ Gender + Age + Occupation + City_Category + 
-                Marital_Status + Product_Category_1 + Product_Category_2 + 
-                Product_Category_3, data = train)
-summary(lm.final)
-step(lm.final,direction = "backward")
+full$Stay_In_Current_City_Years[full$Stay_In_Current_City_Years == "4+"] = 4
+full$Stay_In_Current_City_Years = as.integer(full$Stay_In_Current_City_Years)
 
-lm.final.pred = predict(lm.final,newdata = test)
+full$Gender = ifelse(full$Gender == "M",1,0)
+table(full$Gender)
 
-final_csv = data.frame(user_id,product_id,lm.final.pred)
-head(final_csv)
-colnames(final_csv) = c("User_ID","Product_ID","Purchase")
-write.csv(final_csv,"sub1.csv",row.names = F)
 
-# cor(train[c("Gender","Age","Occupation","City_Category",
-#            "Stay_In_Current_City_Years","Marital_Status",
-#             "Product_Category_1","Product_Category_2","Product_Category_3")])
-# 
-# library(rpart)
-# 
-# cart1 = rpart(formula = Purchase ~ Gender + Age + Occupation + City_Category + 
-#                  Marital_Status + Product_Category_1 + Product_Category_2 + 
-#                  Product_Category_3,method = "anova",data = tr1)
-# library(rpart.plot)
-# library(e1071)
-# library(caret)
-# prp(cart1)
-# cart1.pred = predict(cart1,newdata = te1)
-# head(cart1.pred)
-# 
-# rmse(lm.step.1.pred,te1$Purchase)
-# rmse(cart1.pred,te1$Purchase)
-# 
-# numFolds = trainControl(method = "cv",number = 10)
-# cpGrid = expand.grid(.cp = seq(0.01,0.5,0.01))
-# train(Purchase ~ Gender + Age + Occupation + City_Category + 
-#         Marital_Status + Product_Category_1 + Product_Category_2 + 
-#         Product_Category_3,data = tr1,method = "rpart", trControl = numFolds, tuneGrid = cpGrid )
-# 
-# cart1.cv = rpart(Purchase ~ Gender + Age + Occupation + City_Category + 
-#                    Marital_Status + Product_Category_1 + Product_Category_2 + 
-#                    Product_Category_3,data = tr1,cp = 0.01)
-# prp(cart1.cv)
-# cart1.cv.pred = predict(cart1.cv,newdata = te1)
-# rmse(cart1.cv.pred,te1$Purchase)
+train_new = full[1:length(train_purchase),]
+k = length(train_purchase) + 1
+test_new = full[k:nrow(full),]
+
+train_new$Purchase = train_purchase
+
+#User Count
+user_count = as.data.frame(table(train_new$User_ID))
+colnames(user_count) = c("User_ID","User_Count")
+str(user_count)
+
+train_new = merge(train_new,user_count,by = "User_ID")
+str(train_new)
+test_new = merge(test_new,user_count,by = "User_ID",all.x=T)
+str(test_new)
+summary(test_new)
+
+#Product Count
+product_count = as.data.frame(table(train_new$Product_ID))
+colnames(product_count) = c("Product_ID","Product_Count")
+str(product_count)
+
+train_new = merge(train_new,product_count,by = "Product_ID")
+str(train_new)
+test_new = merge(test_new,product_count,by = "Product_ID",all.x=T)
+str(test_new)
+test_new$Product_Count[is.na(test_new$Product_Count)] = 0
+
+
+mean_purchase = as.data.frame(aggregate(train_new$Purchase,list(train_new$Product_ID),mean))
+colnames(mean_purchase) = c("Product_ID","Mean_Purchase")
+
+train_new = merge(train_new,mean_purchase,by = "Product_ID")
+str(train_new)
+test_new = merge(test_new,mean_purchase,by = "Product_ID",all.x = T)
+test_new$Mean_Purchase[is.na(test_new$Mean_Purchase)] = mean(train_new$Mean_Purchase)
+#
+train_new$high = ifelse(train_new$Purchase > train_new$Mean_Purchase,1,0)
+user_prop = as.data.frame(aggregate(train_new$high,list(train_new$User_ID),mean))
+colnames(user_prop) = c("User_ID","Proportion")
+train_new = merge(train_new,user_prop,by = "User_ID")
+test_new = merge(test_new,user_prop,by = "User_ID")
+#
+
+submit = test_new[c("User_ID","Product_ID")]
+train_purchase = train_new$Purchase
+train_new$Purchase = NULL
+train_new$high = NULL
+train_new$Product_ID = NULL
+test_new$Product_ID = NULL
+
+library(xgboost)
+
+
+test_new = subset(test_new,select = c(colnames(train_new)))
+
+model_xg = xgboost(as.matrix(train_new),as.matrix(train_purchase),
+                   cv=5,objective="reg:linear",nrounds=500,max.depth=10,eta=0.1,
+                  metric="rmse",nthread = -1,colsample_bytree=0.5)
+
+model_xg.pred = predict(model_xg,newdata = as.matrix(test_new))
+model_xg.pred
+submit$Purchase = model_xg.pred
+summary(submit$Purchase)
+submit$Purchase[submit$Purchase < 185] = 185
+submit$Purchase[submit$Purchase > 23961] = 23961
+colnames(submit) = c("User_ID","Product_ID","Purchase")
+write.csv(submit,"sub_1.csv",row.names = F)
